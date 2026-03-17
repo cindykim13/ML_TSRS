@@ -58,15 +58,21 @@ optimal_transform = transforms.Compose([
 ])
 
 ---
+
 ##PHẦN 2: KIẾN TRÚC VÀ KHỞI TẠO MẠNG BIẾN ĐỔI KHÔNG GIAN (STN INITIALIZATION)
+
 ###2.1. Điểm lý thuyết
 Tại Mục 3.2, STN được cấu thành từ Mạng định vị (Localization network), Bộ tạo lưới (Grid generator) và Bộ lấy mẫu (Sampler). Mạng định vị xuất ra tham số 
 θ có 6 chiều để thực hiện phép biến đổi affine 2D (A_θ).
+
 ###2.2. Thực tế mã nguồn
 Trong mã nguồn GitHub, mạng định vị (thường kết thúc bằng một lớp nn.Linear) được để khởi tạo trọng số theo mặc định của PyTorch (He/Kaiming hoặc Xavier Uniform).
+
 ###2.3. Vấn đề / Lỗ hổng
 Đây là một lỗ hổng chí mạng. Theo Jaderberg et al. (2015), nếu lớp tuyến tính cuối cùng của Mạng định vị được khởi tạo ngẫu nhiên, ma trận affine đầu ra sẽ gây ra các phép biến dạng, cắt xén hoặc xoay ảnh hỗn loạn ngay từ epoch đầu tiên. Điều này khiến dòng thông tin lan truyền thuận bị phá hủy, hàm mất mát không thể hội tụ và mạng rơi vào trạng thái cực tiểu cục bộ rất sớm.
+
 ###2.4. Đề xuất khắc phục
+
 Lớp hồi quy cuối cùng của Mạng định vị BẮT BUỘC phải được khởi tạo sao cho trọng số (weights) bằng 0 và độ lệch (biases) tương đương với ma trận đơn vị (Identity Matrix).
 code
 Python
@@ -120,13 +126,19 @@ class OptimizedSpatialTransformer(nn.Module):
         return x_transformed
 
 ---
+
 ##PHẦN 3: CHIẾN LƯỢC TỐI ƯU HÓA HÀM MẤT MÁT (OPTIMIZATION STRATEGY)
+
 ###3.1. Điểm lý thuyết
-Tại Mục 3.3 và 4, tác giả kết luận: SGD không động lượng (momentum) với Learning Rate (LR) = 0.01 cho kết quả tốt nhất (99.71%). Bài báo khẳng định các phương pháp adaptive (Adam, RMSprop) thường tổng quát hóa kém hơn SGD trong các tác vụ thị giác máy tính.
+Tại Mục 3.3 và 4, tác giả kết luận: SGD không động lượng (momentum) với Learning Rate (LR) = 0.01 cho kết quả tốt nhất (99.71%). Bài báo khẳng định các phương 
+pháp adaptive (Adam, RMSprop) thường tổng quát hóa kém hơn SGD trong các tác vụ thị giác máy tính.
+
 ###3.2. Thực tế mã nguồn
 Các triển khai hiện tại thường sử dụng optim.Adam với LR mặc định hoặc SGD với LR tĩnh. Việc thiếu bộ lịch trình (learning rate scheduling) khiến mạng không thể vượt qua mức trần 99.71%.
+
 ###3.3. Vấn đề / Lỗ hổng
 Sử dụng SGD thuần túy (LR tĩnh) là kỹ thuật lạc hậu. Nó khiến mô hình dao động quanh cực tiểu toàn cục mà không thể hội tụ sâu.
+
 ###3.4. Đề xuất khắc phục
 Sử dụng SGDR (Stochastic Gradient Descent with Warm Restarts) thông qua thuật toán CosineAnnealingWarmRestarts. Kỹ thuật này giúp LR giảm theo đường cong Cosine để hội tụ vào các flat minima và "nhảy" ra khỏi các sharp minima định kỳ. Đồng thời áp dụng Gradient Clipping để bảo vệ STN.
 code
@@ -160,7 +172,9 @@ def train_step(model, dataloader, optimizer, criterion, epoch):
     scheduler.step()
     print(f"Epoch {epoch} | Loss: {running_loss/len(dataloader):.4f} | LR: {scheduler.get_last_lr()[0]:.6f}")
 
+
 ---
+
 ###KẾT LUẬN
 Sự chênh lệch giữa học thuật và thực tế trong mã nguồn gốc nằm ở ba điểm cốt lõi:
 Tiền xử lý: Mất mát thông tin viền do thiếu chuẩn hóa tương phản cục bộ đúng nghĩa.
